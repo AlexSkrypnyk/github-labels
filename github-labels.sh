@@ -54,6 +54,10 @@ labels=(
   "Requires more work" "b60205" "Pull request was reviewed and reviver(s) asked to work further on the pull request"
   "URGENT" "d93f0b" "Pull request needs to be urgently reviewed"
   "UPSTREAM" "fbca04" "Issue or pull request is related to an upstream project"
+  "A1" "0E8A16" "Worker 1"
+  "A2" "0E8A16" "Worker 2"
+  "A3" "0E8A16" "Worker 3"
+  "A4" "0E8A16" "Worker 4"
 
   # Uncomment default Github labels below to preserve them.
   # "bug"                 "d73a4a"  "Something isn't working"
