@@ -10,12 +10,18 @@
 # provided as an argument or in $GITHUB_REPO:
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo
 # GITHUB_TOKEN=ghp_123 GITHUB_REPO=myorg/myrepo ./github-labels.sh
+#
+# Every non-archived repository of an organization or a user, after a
+# confirmation:
+# GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg
+# GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --exclude=myorg/repo1,myorg/repo2
+# GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --yes
 
 set -eu
 [ "${DEBUG-}" = "1" ] && set -x
 
-# GitHub repository as "org/name" to perform operations on. Falls back to the
-# first script argument.
+# GitHub repository as "org/name", or an organization or user as "org", to
+# perform operations on. Falls back to the first script argument.
 GITHUB_REPO="${GITHUB_REPO:-}"
 
 # GitHub token to perform operations.
@@ -27,8 +33,8 @@ GITHUB_DELETE_EXISTING_LABELS="${GITHUB_DELETE_EXISTING_LABELS:-1}"
 # Seconds to wait before processing starts, giving a chance to abort.
 GITHUB_PROCESSING_DELAY="${GITHUB_PROCESSING_DELAY:-3}"
 
-# Number of labels requested per page when listing existing labels.
-GITHUB_LABELS_PER_PAGE=100
+# Number of items requested per page when listing labels or repositories.
+GITHUB_PER_PAGE=100
 
 # ------------------------------------------------------------------------------
 
@@ -70,13 +76,42 @@ labels=(
   # "wontfix"             "ffffff"  "This will not be worked on"
 )
 
-# Names of the labels that exist in the repository, populated by main().
+# Names of the labels that exist in the repository, populated by
+# process_labels().
 existing_labels=()
+
+# Repositories to process as "org/repo", populated by main() or
+# select_owner_repos().
+repos=()
+
+# Repositories to skip as "org/repo", populated by parse_excludes().
+excluded_repos=()
 
 # ------------------------------------------------------------------------------
 
 main() {
-  GITHUB_REPO="${GITHUB_REPO:-${1:-}}"
+  local target=""
+  local exclude=""
+  local assume_yes=0
+  local arg
+
+  for arg in "$@"; do
+    case "${arg}" in
+      --exclude=*) exclude="${arg#--exclude=}" ;;
+      -y | --yes) assume_yes=1 ;;
+      -*)
+        fail "Unknown option \"${arg}\""
+        exit 1
+        ;;
+      *)
+        if [ -z "${target}" ]; then
+          target="${arg}"
+        fi
+        ;;
+    esac
+  done
+
+  GITHUB_REPO="${GITHUB_REPO:-${target}}"
 
   for cmd in curl; do
     if ! command -v "${cmd}" >/dev/null; then
@@ -99,7 +134,7 @@ main() {
 
   if [ "${GITHUB_REPO}" = "" ]; then
     echo ''
-    echo -n 'Enter GitHub Org/Repo (e.g. myorg/myrepo): '
+    echo -n 'Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo or myorg): '
     read -r GITHUB_REPO || true
   fi
 
@@ -108,8 +143,24 @@ main() {
     exit 1
   fi
 
-  if ! [[ ${GITHUB_REPO} =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-    fail "GitHub repository must be in the format \"org/repo\""
+  if ! is_repo_name "${GITHUB_REPO}" && ! is_owner_name "${GITHUB_REPO}"; then
+    fail "GitHub repository must be in the format \"org/repo\" or \"org\""
+    exit 1
+  fi
+
+  local owner="${GITHUB_REPO%%/*}"
+  local bulk=1
+
+  if is_repo_name "${GITHUB_REPO}"; then
+    bulk=0
+  fi
+
+  if [ "${bulk}" = "0" ] && [ -n "${exclude}" ]; then
+    fail "Option --exclude can only be used with an organization, not with a repository"
+    exit 1
+  fi
+
+  if ! parse_excludes "${owner}" "${exclude}"; then
     exit 1
   fi
 
@@ -124,9 +175,22 @@ main() {
     exit 1
   fi
 
-  if ! user_has_access; then
-    fail "User does not have access to specified repository. Please check your credentials"
-    exit 1
+  if [ "${bulk}" = "1" ]; then
+    if ! select_owner_repos "${owner}"; then
+      exit 1
+    fi
+
+    if [ "${assume_yes}" != "1" ] && ! confirm "Update labels in ${#repos[@]} repositories?"; then
+      fail "Aborted"
+      exit 1
+    fi
+  else
+    if ! user_has_access; then
+      fail "User does not have access to specified repository. Please check your credentials"
+      exit 1
+    fi
+
+    repos=("${GITHUB_REPO}")
   fi
 
   echo
@@ -136,12 +200,45 @@ main() {
   countdown "${GITHUB_PROCESSING_DELAY}"
   echo
 
+  local -a failed_repos=()
+  local repo
+
+  for repo in "${repos[@]}"; do
+    GITHUB_REPO="${repo}"
+
+    if [ "${bulk}" = "1" ]; then
+      info "Processing repository \"${repo}\""
+    fi
+
+    if ! process_labels; then
+      failed_repos+=("${repo}")
+    fi
+  done
+
+  if [ "${#failed_repos[@]}" -gt 0 ]; then
+    if [ "${bulk}" = "1" ]; then
+      fail "Label processing failed in ${#failed_repos[@]} of ${#repos[@]} repositories:"
+
+      for repo in "${failed_repos[@]}"; do
+        note "${repo}"
+      done
+    fi
+
+    exit 1
+  fi
+
+  pass "Label processing complete"
+  echo
+}
+
+# Synchronizes the labels of $GITHUB_REPO with the provided list.
+process_labels() {
   note "Checking existing labels"
   local existing_labels_list
 
   if ! existing_labels_list="$(label_all)"; then
     fail "Unable to fetch existing labels"
-    exit 1
+    return 1
   fi
 
   existing_labels=()
@@ -196,11 +293,154 @@ main() {
 
   if [ "${errors}" -gt 0 ]; then
     fail "Label processing completed with ${errors} error(s)"
-    exit 1
+    return 1
+  fi
+}
+
+# Populates repos with the non-archived, non-excluded repositories of an
+# organization or a user, and prints them.
+select_owner_repos() {
+  local owner="${1}"
+  local type
+
+  if ! type="$(owner_type "${owner}")"; then
+    fail "Unable to find \"${owner}\". Please check the name and your credentials"
+    return 1
   fi
 
-  pass "Label processing complete"
+  # Private repositories of a user are listed only for the token's own user.
+  local path="/user/repos?affiliation=owner"
+
+  if [ "${type}" = "Organization" ]; then
+    path="/orgs/${owner}/repos?type=all"
+  fi
+
+  local listed
+
+  if ! listed="$(github_paginate "${path}" json_repos)"; then
+    fail "Unable to list repositories of \"${owner}\""
+    return 1
+  fi
+
+  repos=()
+  local archived_count=0
+  local excluded_count=0
+  local name archived name_owner
+
+  while IFS=$'\t' read -r name archived; do
+    name_owner="${name%%/*}"
+
+    # The token's user may differ from the owner, so the list can hold
+    # repositories of another owner.
+    if [ -z "${name}" ] || [ "${name_owner,,}" != "${owner,,}" ]; then
+      continue
+    fi
+
+    if [ "${archived}" = "true" ]; then
+      archived_count=$((archived_count + 1))
+    elif is_excluded "${name}"; then
+      excluded_count=$((excluded_count + 1))
+    else
+      repos+=("${name}")
+    fi
+  done <<<"${listed}"
+
+  if [ "${#repos[@]}" -eq 0 ]; then
+    fail "No repositories to process in \"${owner}\""
+    return 1
+  fi
+
   echo
+  note "Found ${#repos[@]} repositories in \"${owner}\":"
+
+  for name in "${repos[@]}"; do
+    note "  ${name}"
+  done
+
+  note "Skipped ${archived_count} archived and ${excluded_count} excluded repositories"
+  echo
+}
+
+# Prints "User" or "Organization" for an account name.
+owner_type() {
+  local response
+  response="$(github_request GET "/users/${1}")" || true
+
+  if [ "$(api_status "${response}")" != "200" ]; then
+    return 1
+  fi
+
+  local -a types=()
+  mapfile -t types < <(json_strings type "$(api_body "${response}")")
+
+  if [ "${#types[@]}" -eq 0 ]; then
+    return 1
+  fi
+
+  printf '%s' "${types[0]}"
+}
+
+# Validates a comma-separated list of "org/repo" entries against the owner and
+# stores them in excluded_repos.
+parse_excludes() {
+  local owner="${1}"
+  local -a entries=()
+  local entry entry_owner
+
+  IFS=',' read -r -a entries <<<"${2}"
+  excluded_repos=()
+
+  for entry in "${entries[@]}"; do
+    if [ -z "${entry}" ]; then
+      continue
+    fi
+
+    if ! is_repo_name "${entry}"; then
+      fail "Excluded repository \"${entry}\" must be in the format \"org/repo\""
+      return 1
+    fi
+
+    entry_owner="${entry%%/*}"
+
+    if [ "${entry_owner,,}" != "${owner,,}" ]; then
+      fail "Excluded repository \"${entry}\" does not belong to \"${owner}\""
+      return 1
+    fi
+
+    excluded_repos+=("${entry}")
+  done
+}
+
+# GitHub repository names are case-insensitive.
+is_excluded() {
+  local repo="${1,,}"
+  local excluded
+
+  for excluded in "${excluded_repos[@]}"; do
+    if [ "${repo}" = "${excluded,,}" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+is_repo_name() {
+  [[ ${1} =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+}
+
+is_owner_name() {
+  [[ ${1} =~ ^[A-Za-z0-9_.-]+$ ]]
+}
+
+# Asks a yes/no question that defaults to "no".
+confirm() {
+  local answer=""
+
+  echo -n "${1} [y/N] "
+  read -r answer || true
+
+  [[ ${answer} =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 # GitHub label names are case-insensitive, so all name comparisons are too.
@@ -239,25 +479,40 @@ user_has_access() {
 }
 
 label_all() {
+  github_paginate "/repos/${GITHUB_REPO}/labels" json_names
+}
+
+# Prints 1 line per item of every page of a list endpoint.
+#
+# The extractor receives a page body and must print exactly 1 line per item,
+# so a short page marks the last one.
+github_paginate() {
+  local path="${1}"
+  local extractor="${2}"
+  local separator="?"
   local page=1
   local response
-  local page_labels=()
+  local page_items=()
+
+  if [[ ${path} == *\?* ]]; then
+    separator="&"
+  fi
 
   while true; do
-    response="$(github_api GET "/labels?per_page=${GITHUB_LABELS_PER_PAGE}&page=${page}")" || true
+    response="$(github_request GET "${path}${separator}per_page=${GITHUB_PER_PAGE}&page=${page}")" || true
 
     if [ "$(api_status "${response}")" != "200" ]; then
       return 1
     fi
 
-    page_labels=()
-    mapfile -t page_labels < <(json_names "$(api_body "${response}")")
+    page_items=()
+    mapfile -t page_items < <("${extractor}" "$(api_body "${response}")")
 
-    if [ "${#page_labels[@]}" -gt 0 ]; then
-      printf '%s\n' "${page_labels[@]}"
+    if [ "${#page_items[@]}" -gt 0 ]; then
+      printf '%s\n' "${page_items[@]}"
     fi
 
-    if [ "${#page_labels[@]}" -lt "${GITHUB_LABELS_PER_PAGE}" ]; then
+    if [ "${#page_items[@]}" -lt "${GITHUB_PER_PAGE}" ]; then
       break
     fi
 
@@ -298,10 +553,15 @@ label_payload() {
   printf '{"name":"%s","color":"%s","description":"%s"}' "$(json_escape "${1}")" "$(json_escape "${2}")" "$(json_escape "${3}")"
 }
 
-# Prints the response body followed by the HTTP status code on the last line.
+# Sends a request to an endpoint of $GITHUB_REPO.
 github_api() {
+  github_request "${1}" "/repos/${GITHUB_REPO}${2}" "${3:-}"
+}
+
+# Prints the response body followed by the HTTP status code on the last line.
+github_request() {
   local method="${1}"
-  local endpoint="${2}"
+  local path="${2}"
   local data="${3:-}"
 
   local args=(-s -u "${GITHUB_TOKEN}:x-oauth-basic" -H "Accept: application/vnd.github+json" -w '\n%{http_code}' --request "${method}")
@@ -310,7 +570,7 @@ github_api() {
     args+=(--data "${data}")
   fi
 
-  curl "${args[@]}" "https://api.github.com/repos/${GITHUB_REPO}${endpoint}"
+  curl "${args[@]}" "https://api.github.com${path}"
 }
 
 api_status() {
@@ -328,7 +588,39 @@ api_body() {
 # Label objects have no nested "name" keys, so every "name" value in the
 # response is a label name.
 json_names() {
-  printf '%s' "${1}" | grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/^"name"[[:space:]]*:[[:space:]]*"//; s/"$//' || true
+  json_strings name "${1}"
+}
+
+# Prints every string value of a key, in any object of the JSON document.
+json_strings() {
+  printf '%s' "${2}" | grep -o "\"${1}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | sed "s/^\"${1}\"[[:space:]]*:[[:space:]]*\"//; s/\"\$//" || true
+}
+
+# Prints "org/repo<TAB>true|false" with the archived flag of every repository
+# in a list response.
+#
+# Each repository object holds exactly 1 "full_name" and 1 "archived" key, with
+# "full_name" first, so the keys pair up in document order.
+json_repos() {
+  local line
+  local name=""
+
+  while IFS= read -r line; do
+    case "${line}" in
+      '"full_name"'*)
+        name="${line#*:}"
+        name="${name#*\"}"
+        name="${name%\"}"
+        ;;
+      *)
+        if [ -n "${name}" ]; then
+          printf '%s\t%s\n' "${name}" "${line##*[[:space:]:]}"
+        fi
+
+        name=""
+        ;;
+    esac
+  done < <(printf '%s' "${1}" | grep -oE '"(full_name|archived)"[[:space:]]*:[[:space:]]*("[^"]*"|true|false)' || true)
 }
 
 json_escape() {

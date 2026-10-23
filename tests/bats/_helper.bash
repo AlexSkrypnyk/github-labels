@@ -60,18 +60,91 @@ label_payload() {
 #
 # Arguments:
 #   1. HTTP method.
-#   2. Endpoint relative to the repository URL.
+#   2. Path relative to the API root.
 #   3. HTTP status code returned by the API.
 #   4. Response body. Optional.
 #   5. Request body. Optional.
-step_api() {
+step_request() {
   local data=""
 
   if [ -n "${5-}" ]; then
     data=" --data ${5}"
   fi
 
-  printf '@curl -s -u %s:x-oauth-basic -H Accept: application/vnd.github+json -w \\n%%{http_code} --request %s%s https://api.github.com/repos/%s%s # 0 # %s\\n%s' "${TEST_TOKEN}" "${1}" "${data}" "${TEST_REPO}" "${2}" "${4-}" "${3}"
+  printf '@curl -s -u %s:x-oauth-basic -H Accept: application/vnd.github+json -w \\n%%{http_code} --request %s%s https://api.github.com%s # 0 # %s\\n%s' "${TEST_TOKEN}" "${1}" "${data}" "${2}" "${4-}" "${3}"
+}
+
+# Prints a step that mocks 1 GitHub API call for the repository in TEST_REPO.
+#
+# Arguments:
+#   1. HTTP method.
+#   2. Endpoint relative to the repository URL.
+#   3. HTTP status code returned by the API.
+#   4. Response body. Optional.
+#   5. Request body. Optional.
+step_api() {
+  step_request "${1}" "/repos/${TEST_REPO}${2}" "${3}" "${4-}" "${5-}"
+}
+
+# Prints a step that mocks the account lookup of an owner.
+#
+# Arguments:
+#   1. Owner name.
+#   2. Account type: 'Organization' or 'User'.
+#   3. HTTP status code. Optional, defaults to 200.
+step_owner() {
+  step_request GET "/users/${1}" "${3:-200}" "{\"login\":\"${1}\",\"id\":1,\"type\":\"${2}\",\"user_view_type\":\"public\"}"
+}
+
+# Prints a step that mocks 1 page of a repository list.
+#
+# Arguments:
+#   1. Path of the list endpoint, with its query string.
+#   2. Page number.
+#   3. Response body.
+#   4. HTTP status code. Optional, defaults to 200.
+step_repos() {
+  step_request GET "${1}&per_page=100&page=${2}" "${4:-200}" "${3}"
+}
+
+# Prints the JSON list of repositories.
+#
+# Nested "owner" and "license" objects carry "type" and "name" keys, so the
+# parser is exercised against the real response shape.
+#
+# Arguments:
+#   1+. Repositories as "org/repo", with a ":archived" suffix for archived ones.
+repos_json() {
+  local json=""
+  local entry full_name archived
+
+  for entry in "$@"; do
+    full_name="${entry%%:*}"
+    archived="false"
+
+    if [ "${entry}" != "${full_name}" ]; then
+      archived="true"
+    fi
+
+    json="${json},{\"id\":1,\"name\":\"${full_name#*/}\",\"full_name\":\"${full_name}\",\"private\":false,\"owner\":{\"login\":\"${full_name%%/*}\",\"type\":\"Organization\"},\"license\":{\"key\":\"mit\",\"name\":\"MIT License\"},\"archived\":${archived},\"disabled\":false}"
+  done
+
+  printf '[%s]' "${json#,}"
+}
+
+# Appends steps for processing every provided label in each repository to the
+# STEPS array, with every repository holding no labels.
+#
+# Arguments:
+#   1+. Repositories as "org/repo".
+steps_repos_labels() {
+  local repo
+
+  for repo in "$@"; do
+    TEST_REPO="${repo}"
+    STEPS+=("Processing repository \"${repo}\"" "$(step_list 1 "[]")")
+    steps_labels
+  done
 }
 
 # Prints a step that mocks the repository access check.
