@@ -1,0 +1,9 @@
+{
+    "name": "github-labels-tests",
+    "version": "1.0.0",
+    "description": "Packages used for testing",
+    "private": true,
+    "devDependencies": {
+        "bats-helpers": "npm:@drevops/bats-helpers@^2.0"
+    }
+}
