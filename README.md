@@ -24,9 +24,15 @@ The script reads these environment variables:
 |---------------------------------|---------|-----------------------------------------------------------------------------------------------|
 | `GITHUB_REPO`                   | None    | Repository as `org/repo`, or organization as `org`. Takes precedence over the first argument. |
 | `GITHUB_TOKEN`                  | None    | Personal access token. The script prompts for it when empty.                                  |
-| `GITHUB_DELETE_EXISTING_LABELS` | `1`     | If `1`, deletes every label missing from the list, so the repository mirrors it.              |
+| `GITHUB_DELETE_EXISTING_LABELS` | `1`     | If `1`, deletes every label missing from the list. `--keep-existing` sets it to `0`.          |
 | `GITHUB_PROCESSING_DELAY`       | `3`     | Seconds to wait before changing labels. Press <kbd>Ctrl-C</kbd> to abort.                     |
 | `DEBUG`                         | None    | If `1`, prints every command the script runs.                                                 |
+
+To keep the labels missing from the list, add `--keep-existing`. It applies to a single repository and to every repository of an organization:
+
+```shell
+GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo --keep-existing
+```
 
 Label names match case-insensitively. An existing `blocked` label gets renamed to `BLOCKED`, so it stays on its issues and pull requests.
 

@@ -16,6 +16,9 @@
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --exclude=myorg/repo1,myorg/repo2
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --yes
+#
+# Keep existing labels that are not in the list:
+# GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo --keep-existing
 
 set -eu
 [ "${DEBUG-}" = "1" ] && set -x
@@ -27,7 +30,7 @@ GITHUB_REPO="${GITHUB_REPO:-}"
 # GitHub token to perform operations.
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
-# Delete existing labels to mirror the list below.
+# Delete existing labels to mirror the list below. Set to 0 by --keep-existing.
 GITHUB_DELETE_EXISTING_LABELS="${GITHUB_DELETE_EXISTING_LABELS:-1}"
 
 # Seconds to wait before processing starts, giving a chance to abort.
@@ -45,8 +48,9 @@ pass() { [ "${TERM:-}" != "dumb" ] && tput colors >/dev/null 2>&1 && printf "\03
 fail() { [ "${TERM:-}" != "dumb" ] && tput colors >/dev/null 2>&1 && printf "\033[31m[FAIL] %s\033[0m\n" "${1}" || printf "[FAIL] %s\n" "${1}"; }
 # @formatter:on
 
-# Array of labels to create. If DELETE_EXISTING_LABELS=1, the labels list will
-# be exactly as below, otherwise labels below will be added to existing ones.
+# Array of labels to create. If GITHUB_DELETE_EXISTING_LABELS=1, the labels list
+# will be exactly as below, otherwise labels below will be added to existing
+# ones.
 labels=(
   "BLOCKED" "D93F0B" "Issue or pull request is blocked"
   "AUTOMERGE" "934BF4" "Pull request has been approved and set to automerge"
@@ -99,6 +103,7 @@ main() {
     case "${arg}" in
       --exclude=*) exclude="${arg#--exclude=}" ;;
       -y | --yes) assume_yes=1 ;;
+      --keep-existing) GITHUB_DELETE_EXISTING_LABELS=0 ;;
       -*)
         fail "Unknown option \"${arg}\""
         exit 1
@@ -124,9 +129,9 @@ main() {
 
   echo
   if [ "${GITHUB_DELETE_EXISTING_LABELS}" = "1" ]; then
-    echo "  This script will remove the default GitHub labels."
+    echo "  This script will remove labels that are not in the list."
   else
-    echo "  This script will not remove the default GitHub labels."
+    echo "  This script will keep labels that are not in the list."
   fi
   echo "  This script will create new labels."
   echo "  A personal access token is required to access private repositories."
