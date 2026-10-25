@@ -11,7 +11,7 @@ load _helper
 
 @test "Repository and token are requested interactively" {
   declare -a STEPS=(
-    "This script will remove the default GitHub labels."
+    "This script will remove labels that are not in the list."
     "Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo or myorg):"
     "GitHub Personal Access Token:"
     "$(step_access)"
@@ -206,7 +206,7 @@ provide_invalid_arguments() {
   export GITHUB_DELETE_EXISTING_LABELS=0
 
   declare -a STEPS=(
-    "This script will not remove the default GitHub labels."
+    "This script will keep labels that are not in the list."
     "$(step_api GET "/labels?per_page=1" 200 "[]")"
     "$(step_list 1 "$(labels_json "bug" "Dependencies")")"
     "- Removing label"
@@ -218,6 +218,62 @@ provide_invalid_arguments() {
   mocks="$(steps_run "setup")"
 
   run "${SCRIPT_FILE}" "${TEST_REPO}"
+  assert_success
+
+  steps_run "assert" "${mocks}"
+}
+
+@test "Labels not in the provided list are preserved with --keep-existing" {
+  export GITHUB_TOKEN="${TEST_TOKEN}"
+  export GITHUB_DELETE_EXISTING_LABELS=1
+
+  declare -a STEPS=(
+    "This script will keep labels that are not in the list."
+    "- This script will remove labels that are not in the list."
+    "$(step_access)"
+    "$(step_list 1 "$(labels_json "bug" "good first issue" "blocked")")"
+    "- Removing label"
+    "- DELETED label"
+  )
+  steps_labels "BLOCKED|update|200|blocked"
+  STEPS+=("[ OK ] Label processing complete")
+
+  mocks="$(steps_run "setup")"
+
+  run "${SCRIPT_FILE}" "${TEST_REPO}" "--keep-existing"
+  assert_success
+
+  steps_run "assert" "${mocks}"
+}
+
+@test "Labels not in the provided list are preserved in every repository with --keep-existing" {
+  export GITHUB_TOKEN="${TEST_TOKEN}"
+
+  declare -a STEPS=(
+    "This script will keep labels that are not in the list."
+    "$(step_owner myorg Organization)"
+    "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/two")")"
+  )
+
+  local repo
+  for repo in "myorg/one" "myorg/two"; do
+    TEST_REPO="${repo}"
+    STEPS+=(
+      "Processing repository \"${repo}\""
+      "$(step_list 1 "$(labels_json "bug")")"
+    )
+    steps_labels
+  done
+
+  STEPS+=(
+    "- Removing label"
+    "- DELETED label"
+    "[ OK ] Label processing complete"
+  )
+
+  mocks="$(steps_run "setup")"
+
+  run "${SCRIPT_FILE}" "--keep-existing" "myorg" "--yes"
   assert_success
 
   steps_run "assert" "${mocks}"
