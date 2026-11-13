@@ -155,7 +155,7 @@ main() {
   GITHUB_REPO="$(normalize_repo "${GITHUB_REPO}")"
 
   if ! is_repo_name "${GITHUB_REPO}" && ! is_owner_name "${GITHUB_REPO}"; then
-    fail "GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+    fail 'GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
     exit 1
   fi
 
