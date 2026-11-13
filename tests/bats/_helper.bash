@@ -4,7 +4,7 @@
 #
 # Run with "--verbose-run" to see debug output.
 #
-# shellcheck disable=SC2034
+# shellcheck disable=SC2034,SC2119,SC2120
 
 ################################################################################
 #                       BATS HOOK IMPLEMENTATIONS                              #
