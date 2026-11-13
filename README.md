@@ -1,18 +1,52 @@
-# Update project labels in GitHub.
+<p align="center">
+  <a href="" rel="noopener">
+  <img width=200px height=200px src="logo.png" alt="github-labels logo"></a>
+</p>
 
-[![Test](https://github.com/AlexSkrypnyk/github-labels/actions/workflows/test.yml/badge.svg)](https://github.com/AlexSkrypnyk/github-labels/actions/workflows/test.yml)
+<h1 align="center">Update project labels in GitHub</h1>
 
-## Usage:
-```shell
-# Interactive prompt:
-# ./github-labels.sh
-#
-# Silent, if $GITHUB_TOKEN or $GITHUB_TOKEN is set in an environment and
-# a repository provided as an argument:
-# GITHUB_TOKEN=ghp_123 GITHUB_REPO=myorg/myrepo ./github-labels.sh
+<div align="center">
+
+[![GitHub Issues](https://img.shields.io/github/issues/AlexSkrypnyk/github-labels.svg)](https://github.com/AlexSkrypnyk/github-labels/issues)
+[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/AlexSkrypnyk/github-labels.svg)](https://github.com/AlexSkrypnyk/github-labels/pulls)
+[![Test Shell](https://github.com/AlexSkrypnyk/github-labels/actions/workflows/test-shell.yml/badge.svg)](https://github.com/AlexSkrypnyk/github-labels/actions/workflows/test-shell.yml)
+[![codecov](https://codecov.io/gh/AlexSkrypnyk/github-labels/graph/badge.svg)](https://codecov.io/gh/AlexSkrypnyk/github-labels)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/AlexSkrypnyk/github-labels)
+![LICENSE](https://img.shields.io/github/license/AlexSkrypnyk/github-labels)
+![Renovate](https://img.shields.io/badge/renovate-enabled-green?logo=renovatebot)
+
+</div>
+
+---
+
+## Features
+
+The script sets the labels of a GitHub repository to the list it carries:
+
+- Creates the missing labels and updates the existing ones
+- Deletes labels missing from the list, unless you add `--keep-existing`
+- Updates every repository of an organization or user, with `--exclude` to skip some
+- Accepts `org/repo`, `org` or a GitHub URL as the target
+
+## Installation
+
+Copy the shell script, `github-labels.sh`, from this repository and make it executable:
+
+```bash
+chmod +x github-labels.sh
 ```
 
-The script needs Bash 4 or later and `curl`. Pass the repository as `org/repo`, either as the first argument or in `GITHUB_REPO`:
+The script needs Bash 4 or later and `curl`.
+
+## Usage
+
+Run the script, and it prompts for the repository and the token:
+
+```shell
+./github-labels.sh
+```
+
+To skip the prompts, set the token in `GITHUB_TOKEN`. Pass the repository as `org/repo`, either as the first argument or in `GITHUB_REPO`:
 
 ```shell
 GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo
@@ -79,13 +113,23 @@ GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --yes
 
 A failing repository doesn't stop the run. The script processes the remaining repositories, lists the failed ones and exits with `1`.
 
-## Testing
+## Contribute
 
-The tests use [BATS](https://github.com/bats-core/bats-core) and [bats-helpers](https://github.com/drevops/bats-helpers). They replace `curl` with a mock, so they run offline.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) lists the commands that install the dependencies and run the linters and tests.
 
-To run the tests:
+## Configure the GitHub repository
 
-```shell
-npm ci --prefix tests/bats
-./tests/bats/node_modules/.bin/bats tests/bats
+To apply the Scaffold repository settings, labels and default branch ruleset to this project's GitHub repository, run the following command in the project's root directory:
+
+```bash
+curl -fsSL https://getscaffold.dev/install.sh | bash -s -- github
 ```
+
+The command needs [GitHub CLI](https://cli.github.com) and a GitHub token in `SCAFFOLD_GITHUB_TOKEN`. The [GitHub repository setup](https://getscaffold.dev/github) page lists the permissions the token needs.
+
+## Update from the template
+
+To pull the latest infrastructure from the Scaffold template into this project, ask Claude Code to "update scaffold". Claude Code follows the instructions in [`AGENTS.md`](AGENTS.md).
+
+---
+_This repository was created using the [Scaffold](https://getscaffold.dev/) project template_
