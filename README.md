@@ -18,11 +18,23 @@ The script needs Bash 4 or later and `curl`. Pass the repository as `org/repo`, 
 GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo
 ```
 
+The first argument and `GITHUB_REPO` also accept a GitHub URL:
+
+- A browser URL, such as `https://github.com/myorg/myrepo`
+- A clone URL, such as `git@github.com:myorg/myrepo.git`
+- An organization URL, such as `https://github.com/myorg`
+
+```shell
+GITHUB_TOKEN=ghp_123 ./github-labels.sh https://github.com/myorg/myrepo
+```
+
+A URL with a longer path, such as `https://github.com/myorg/myrepo/issues`, stops the script before it sends a request.
+
 The script reads these environment variables:
 
 | Variable                        | Default | Description                                                                                   |
 |---------------------------------|---------|-----------------------------------------------------------------------------------------------|
-| `GITHUB_REPO`                   | None    | Repository as `org/repo`, or organization as `org`. Takes precedence over the first argument. |
+| `GITHUB_REPO`                   | None    | Repository as `org/repo`, organization as `org` or either as a GitHub URL. Takes precedence over the first argument. |
 | `GITHUB_TOKEN`                  | None    | Personal access token. The script prompts for it when empty.                                  |
 | `GITHUB_DELETE_EXISTING_LABELS` | `1`     | If `1`, deletes every label missing from the list. `--keep-existing` sets it to `0`.          |
 | `GITHUB_PROCESSING_DELAY`       | `3`     | Seconds to wait before changing labels. Press <kbd>Ctrl-C</kbd> to abort.                     |
@@ -53,7 +65,7 @@ The owner type decides which repositories the list holds:
 - For an organization, the list holds every repository the token can read, private ones included.
 - For a user, the list holds the repositories the token's own user owns, so pass your own user name.
 
-To skip repositories, list them in `--exclude`. Each entry is `org/repo` in the same organization. Any other entry stops the script before it sends a request:
+To skip repositories, list them in `--exclude`. Each entry is `org/repo` or its GitHub URL, in the same organization. Any other entry stops the script before it sends a request:
 
 ```shell
 GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg --exclude=myorg/repo1,myorg/repo2

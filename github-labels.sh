@@ -11,6 +11,9 @@
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg/myrepo
 # GITHUB_TOKEN=ghp_123 GITHUB_REPO=myorg/myrepo ./github-labels.sh
 #
+# A repository or an organization can also be a GitHub URL:
+# GITHUB_TOKEN=ghp_123 ./github-labels.sh https://github.com/myorg/myrepo
+#
 # Every non-archived repository of an organization or a user, after a
 # confirmation:
 # GITHUB_TOKEN=ghp_123 ./github-labels.sh myorg
@@ -24,7 +27,8 @@ set -eu
 [ "${DEBUG-}" = "1" ] && set -x
 
 # GitHub repository as "org/name", or an organization or user as "org", to
-# perform operations on. Falls back to the first script argument.
+# perform operations on. Both also accept a GitHub URL. Falls back to the first
+# script argument.
 GITHUB_REPO="${GITHUB_REPO:-}"
 
 # GitHub token to perform operations.
@@ -139,7 +143,7 @@ main() {
 
   if [ "${GITHUB_REPO}" = "" ]; then
     echo ''
-    echo -n 'Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo or myorg): '
+    echo -n 'Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo, https://github.com/myorg/myrepo or myorg): '
     read -r GITHUB_REPO || true
   fi
 
@@ -148,8 +152,10 @@ main() {
     exit 1
   fi
 
+  GITHUB_REPO="$(normalize_repo "${GITHUB_REPO}")"
+
   if ! is_repo_name "${GITHUB_REPO}" && ! is_owner_name "${GITHUB_REPO}"; then
-    fail "GitHub repository must be in the format \"org/repo\" or \"org\""
+    fail "GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
     exit 1
   fi
 
@@ -390,7 +396,7 @@ owner_type() {
 parse_excludes() {
   local owner="${1}"
   local -a entries=()
-  local entry entry_owner
+  local entry repo repo_owner
 
   IFS=',' read -r -a entries <<<"${2}"
   excluded_repos=()
@@ -400,20 +406,42 @@ parse_excludes() {
       continue
     fi
 
-    if ! is_repo_name "${entry}"; then
-      fail "Excluded repository \"${entry}\" must be in the format \"org/repo\""
+    repo="$(normalize_repo "${entry}")"
+
+    if ! is_repo_name "${repo}"; then
+      fail "Excluded repository \"${entry}\" must be in the format \"org/repo\" or a GitHub URL"
       return 1
     fi
 
-    entry_owner="${entry%%/*}"
+    repo_owner="${repo%%/*}"
 
-    if [ "${entry_owner,,}" != "${owner,,}" ]; then
+    if [ "${repo_owner,,}" != "${owner,,}" ]; then
       fail "Excluded repository \"${entry}\" does not belong to \"${owner}\""
       return 1
     fi
 
-    excluded_repos+=("${entry}")
+    excluded_repos+=("${repo}")
   done
+}
+
+# Prints "org/repo" or "org" from a GitHub URL, such as
+# "https://github.com/org/repo" or "git@github.com:org/repo.git". Other values
+# are printed unchanged.
+normalize_repo() {
+  local value="${1}"
+
+  # The prefix is matched on the lowercased value, which keeps its length, so
+  # the match length also applies to the original value.
+  if ! [[ ${value,,} =~ ^((https?|ssh)://)?(git@)?(www\.)?github\.com[/:] ]]; then
+    printf '%s' "${value}"
+    return 0
+  fi
+
+  value="${value:${#BASH_REMATCH[0]}}"
+  value="${value%/}"
+  value="${value%.git}"
+
+  printf '%s' "${value}"
 }
 
 # GitHub repository names are case-insensitive.
