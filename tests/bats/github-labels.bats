@@ -12,7 +12,7 @@ load _helper
 @test "Repository and token are requested interactively" {
   declare -a STEPS=(
     "This script will remove labels that are not in the list."
-    "Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo or myorg):"
+    "Enter GitHub Org/Repo, or Org for all its repositories (e.g. myorg/myrepo, https://github.com/myorg/myrepo or myorg):"
     "GitHub Personal Access Token:"
     "$(step_access)"
     "$(step_list 1 "[]")"
@@ -45,6 +45,65 @@ load _helper
   mocks="$(steps_run "setup")"
 
   run "${SCRIPT_FILE}" "${TEST_REPO}"
+  assert_success
+
+  steps_run "assert" "${mocks}"
+}
+
+@test "Repository is read from a GitHub URL argument" {
+  export GITHUB_TOKEN="${TEST_TOKEN}"
+
+  declare -a STEPS=(
+    "- Enter GitHub Org/Repo"
+    "$(step_access)"
+    "$(step_list 1 "[]")"
+  )
+  steps_labels
+  STEPS+=("[ OK ] Label processing complete")
+
+  mocks="$(steps_run "setup")"
+
+  run "${SCRIPT_FILE}" "https://github.com/${TEST_REPO}.git/"
+  assert_success
+
+  steps_run "assert" "${mocks}"
+}
+
+@test "Repository is read from a GitHub URL in GITHUB_REPO" {
+  export GITHUB_TOKEN="${TEST_TOKEN}"
+  export GITHUB_REPO="git@github.com:${TEST_REPO}.git"
+
+  declare -a STEPS=(
+    "$(step_access)"
+    "$(step_list 1 "[]")"
+  )
+  steps_labels
+  STEPS+=("[ OK ] Label processing complete")
+
+  mocks="$(steps_run "setup")"
+
+  run "${SCRIPT_FILE}"
+  assert_success
+
+  steps_run "assert" "${mocks}"
+}
+
+@test "Organization is read from a GitHub URL and excludes accept URLs" {
+  export GITHUB_TOKEN="${TEST_TOKEN}"
+
+  declare -a STEPS=(
+    "$(step_owner myorg Organization)"
+    "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/two")")"
+    "Found 1 repositories in \"myorg\":"
+    "Skipped 0 archived and 1 excluded repositories"
+    "- Processing repository \"myorg/two\""
+  )
+  steps_repos_labels "myorg/one"
+  STEPS+=("[ OK ] Label processing complete")
+
+  mocks="$(steps_run "setup")"
+
+  run "${SCRIPT_FILE}" "https://github.com/myorg/" "--exclude=https://github.com/myorg/two" "--yes"
   assert_success
 
   steps_run "assert" "${mocks}"
@@ -93,13 +152,16 @@ run_script() {
 }
 
 provide_invalid_arguments() {
-  dataprovider_case "empty repo" "myorg/" "[FAIL] GitHub repository must be in the format \"org/repo\" or \"org\""
-  dataprovider_case "empty org" "/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\" or \"org\""
-  dataprovider_case "extra segment" "myorg/myrepo/extra" "[FAIL] GitHub repository must be in the format \"org/repo\" or \"org\""
-  dataprovider_case "whitespace" "my org/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\" or \"org\""
-  dataprovider_case "url" "https://github.com/myorg/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\" or \"org\""
+  dataprovider_case "empty repo" "myorg/" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "empty org" "/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "extra segment" "myorg/myrepo/extra" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "whitespace" "my org/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "url with extra segments" "https://github.com/myorg/myrepo/issues" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "url without owner" "https://github.com/" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "url of another host" "https://gitlab.com/myorg/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+  dataprovider_case "exclude url of another host" "myorg" "--exclude=https://gitlab.com/myorg/one" "[FAIL] Excluded repository \"https://gitlab.com/myorg/one\" must be in the format \"org/repo\" or a GitHub URL"
   dataprovider_case "unknown option" "myorg" "--force" "[FAIL] Unknown option \"--force\""
-  dataprovider_case "exclude without separator" "--exclude=myorg/one,two" "myorg" "[FAIL] Excluded repository \"two\" must be in the format \"org/repo\""
+  dataprovider_case "exclude without separator" "--exclude=myorg/one,two" "myorg" "[FAIL] Excluded repository \"two\" must be in the format \"org/repo\" or a GitHub URL"
   dataprovider_case "exclude with another org" "myorg" "--exclude=myorg/one,otherorg/two" "[FAIL] Excluded repository \"otherorg/two\" does not belong to \"myorg\""
   dataprovider_case "exclude with a repository" "myorg/myrepo" "--exclude=myorg/one" "[FAIL] Option --exclude can only be used with an organization, not with a repository"
 }

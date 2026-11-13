@@ -134,6 +134,42 @@ provide_name_kind() {
   dataprovider_case "whitespace" "my org" "invalid"
 }
 
+@test "normalize_repo" {
+  dataprovider_run_cases "normalize_repo" "provide_normalize_repo" "assert_output"
+}
+
+normalize_repo() {
+  script_function normalize_repo "$@"
+}
+
+provide_normalize_repo() {
+  dataprovider_case "repo" "myorg/myrepo" "myorg/myrepo"
+  dataprovider_case "owner" "myorg" "myorg"
+  dataprovider_case "https" "https://github.com/alexSkrypnyk/snapshot" "alexSkrypnyk/snapshot"
+  dataprovider_case "http" "http://github.com/myorg/myrepo" "myorg/myrepo"
+  dataprovider_case "no scheme" "github.com/myorg/myrepo" "myorg/myrepo"
+  dataprovider_case "www" "https://www.github.com/myorg/myrepo" "myorg/myrepo"
+  dataprovider_case "uppercase host" "HTTPS://GitHub.com/MyOrg/MyRepo" "MyOrg/MyRepo"
+  dataprovider_case "trailing slash" "https://github.com/myorg/myrepo/" "myorg/myrepo"
+  dataprovider_case "git suffix" "https://github.com/myorg/myrepo.git" "myorg/myrepo"
+  dataprovider_case "git suffix and trailing slash" "https://github.com/myorg/myrepo.git/" "myorg/myrepo"
+  dataprovider_case "ssh" "git@github.com:myorg/myrepo.git" "myorg/myrepo"
+  dataprovider_case "ssh scheme" "ssh://git@github.com/myorg/myrepo.git" "myorg/myrepo"
+  dataprovider_case "owner url" "https://github.com/myorg" "myorg"
+  dataprovider_case "owner url with trailing slash" "https://github.com/myorg/" "myorg"
+  dataprovider_case "extra segments" "https://github.com/myorg/myrepo/issues" "myorg/myrepo/issues"
+  dataprovider_case "host only" "https://github.com/" ""
+  dataprovider_case "other host" "https://gitlab.com/myorg/myrepo" "https://gitlab.com/myorg/myrepo"
+  dataprovider_case "host as a prefix" "https://github.community/myorg" "https://github.community/myorg"
+  dataprovider_case "repo named github.com" "myorg/github.com" "myorg/github.com"
+}
+
+@test "parse_excludes normalizes GitHub URLs" {
+  run bash -c 'source "${1}"; parse_excludes myorg "https://github.com/myorg/one,git@github.com:MyOrg/two.git"; printf "%s\n" "${excluded_repos[@]}"' bash "${SCRIPT_FILE}"
+  assert_success
+  assert_output $'myorg/one\nMyOrg/two'
+}
+
 @test "parse_excludes stores entries and skips empty ones" {
   run bash -c 'source "${1}"; parse_excludes myorg "myorg/one,,MYORG/Two,"; printf "%s\n" "${excluded_repos[@]}"' bash "${SCRIPT_FILE}"
   assert_success
