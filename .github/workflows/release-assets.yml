@@ -1,22 +1,26 @@
 name: Release assets
 
 on:
-  release:
+  workflow_run:
+    workflows:
+      - Draft release notes
     types:
-      - published
+      - completed
   workflow_dispatch:
-    inputs:
-      tag:
-        type: string
-        description: 'Release tag to attach the assets to.'
-        required: true
 
 permissions:
   contents: read
 
+# Runs queue instead of overlapping, and each one checks out the current
+# default branch, so a later run never uploads an older script.
+concurrency:
+  group: release-assets
+  cancel-in-progress: false
+
 jobs:
   release-assets:
     name: Attach release assets
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     permissions:
@@ -26,11 +30,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
-      - name: Upload script to the release
+      - name: Upload script to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: gh release upload "${TAG}" github-labels.sh --clobber --repo "${GITHUB_REPOSITORY}"
+        run: |
+          TAGS="$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName')"
+          if [ -z "${TAGS}" ]; then
+            echo "No draft release to attach the assets to."
+            exit 0
+          fi
+          if [ "$(printf '%s\n' "${TAGS}" | wc -l)" -gt 1 ]; then
+            echo "::error::Found more than 1 draft release: $(printf '%s' "${TAGS}" | tr '\n' ' ')"
+            exit 1
+          fi
+          gh release upload "${TAGS}" github-labels.sh --clobber --repo "${GITHUB_REPOSITORY}"
