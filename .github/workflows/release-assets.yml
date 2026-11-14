@@ -1,0 +1,36 @@
+name: Release assets
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        description: 'Release tag to attach the assets to.'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-assets:
+    name: Attach release assets
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          persist-credentials: false
+
+      - name: Upload script to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release upload "${TAG}" github-labels.sh --clobber --repo "${GITHUB_REPOSITORY}"
