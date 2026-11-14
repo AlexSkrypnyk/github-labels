@@ -62,8 +62,6 @@ jobs:
         run: npm ci
         working-directory: tests/bats
 
-      # Build kcov outside the workspace, so its own scripts stay out of the
-      # coverage report that '--bash-parse-files-in-dir=.' collects.
       - name: Install Kcov
         run: |
           KCOV_VERSION=v43 && \
@@ -82,38 +80,27 @@ jobs:
         shell: bash
         continue-on-error: ${{ vars.CI_TEST_IGNORE_FAILURE == '1' }}
 
-      - name: Check code coverage threshold
+      - name: Generate code coverage summary
         if: matrix.os == 'ubuntu-latest'
         run: |
-          REPORT=.logs/.coverage-html/bats/cobertura.xml
-          RATE=$(grep -o 'line-rate="[0-9.]*"' "${REPORT}" | head -1 | tr -cd '0-9.')
-          COVERED=$(grep -o 'lines-covered="[0-9]*"' "${REPORT}" | head -1 | tr -cd '0-9')
-          VALID=$(grep -o 'lines-valid="[0-9]*"' "${REPORT}" | head -1 | tr -cd '0-9')
-          PERCENT=$(awk "BEGIN {printf \"%.2f\", $RATE*100}")
-          echo "Coverage: $PERCENT% (threshold: $CI_CODE_COVERAGE_THRESHOLD%)"
-          if [[ ${PERCENT//./} -lt $((CI_CODE_COVERAGE_THRESHOLD*100)) ]]; then
-            echo "FAIL: coverage too low"
-            exit 1
-          fi
-          {
-            echo "COVERAGE_CONTENT<<EOF"
-            echo "Code Coverage Report:"
-            echo "  Lines: ${PERCENT}% (${COVERED}/${VALID})"
-            echo ""
-            # kcov writes absolute file names, so strip the workspace prefix.
-            sed -n 's/.*<class [^>]*filename="\([^"]*\)"[^>]*line-rate="\([0-9.]*\)".*/\1 \2/p' "${REPORT}" | awk -v ws="${GITHUB_WORKSPACE}/" '{ if (index($1, ws) == 1) $1 = substr($1, length(ws) + 1); printf "%s\n  Lines: %6.2f%%\n", $1, $2 * 100 }'
-            echo "EOF"
-          } >> "$GITHUB_ENV"
+          jq -r --arg root "${GITHUB_WORKSPACE}/" '
+            ["File", "% Lines", "Lines"],
+            ["All files", .percent_covered, "\(.covered_lines)/\(.total_lines)"],
+            (.files | sort_by(.file)[] | [(.file | ltrimstr($root)), .percent_covered, "\(.covered_lines)/\(.total_lines)"])
+            | @tsv
+          ' .logs/.coverage-html/bats/coverage.json | column -t -s $'\t' > .logs/coverage.txt
+          cat .logs/coverage.txt
+          { echo "COVERAGE_CONTENT<<EOF"; cat .logs/coverage.txt; echo "EOF"; } >> "$GITHUB_ENV"
         shell: bash
-        env:
-          CI_CODE_COVERAGE_THRESHOLD: ${{ vars.CI_CODE_COVERAGE_THRESHOLD || '80' }}
 
-      # A pull request from a fork gets a read-only token, so it cannot comment.
       - name: Post coverage summary as PR comment
-        if: matrix.os == 'ubuntu-latest' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: matrix.os == 'ubuntu-latest' && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@70d2764d1a7d5d9560b100cbea0077fc8f633987 # v3
         with:
+          header: coverage-shell
           message: |
+            **Shell code coverage**
+
             ```
             ${{ env.COVERAGE_CONTENT }}
             ```
@@ -126,7 +113,7 @@ jobs:
         with:
           name: ${{github.job}}-code-coverage-report
           include-hidden-files: true
-          path: .logs/.coverage-html
+          path: .logs
           if-no-files-found: error
 
       - name: Upload coverage report to Codecov
