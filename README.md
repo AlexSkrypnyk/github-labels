@@ -30,9 +30,10 @@ The script sets the labels of a GitHub repository to the list it carries:
 
 ## Installation
 
-Copy the shell script, `github-labels.sh`, from this repository and make it executable:
+Download the shell script, `github-labels.sh`, from the latest release and make it executable:
 
 ```bash
+curl -fsSLO https://github.com/AlexSkrypnyk/github-labels/releases/latest/download/github-labels.sh
 chmod +x github-labels.sh
 ```
 
@@ -116,20 +117,6 @@ A failing repository doesn't stop the run. The script processes the remaining re
 ## Contribute
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) lists the commands that install the dependencies and run the linters and tests.
-
-## Configure the GitHub repository
-
-To apply the Scaffold repository settings, labels and default branch ruleset to this project's GitHub repository, run the following command in the project's root directory:
-
-```bash
-curl -fsSL https://getscaffold.dev/install.sh | bash -s -- github
-```
-
-The command needs [GitHub CLI](https://cli.github.com) and a GitHub token in `SCAFFOLD_GITHUB_TOKEN`. The [GitHub repository setup](https://getscaffold.dev/github) page lists the permissions the token needs.
-
-## Update from the template
-
-To pull the latest infrastructure from the Scaffold template into this project, ask Claude Code to "update scaffold". Claude Code follows the instructions in [`AGENTS.md`](AGENTS.md).
 
 ---
 _This repository was created using the [Scaffold](https://getscaffold.dev/) project template_
