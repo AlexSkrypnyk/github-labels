@@ -94,9 +94,9 @@ load _helper
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/two")")"
-    "Found 1 repositories in \"myorg\":"
+    'Found 1 repositories in "myorg":'
     "Skipped 0 archived and 1 excluded repositories"
-    "- Processing repository \"myorg/two\""
+    '- Processing repository "myorg/two"'
   )
   steps_repos_labels "myorg/one"
   STEPS+=("[ OK ] Label processing complete")
@@ -152,17 +152,17 @@ run_script() {
 }
 
 provide_invalid_arguments() {
-  dataprovider_case "empty repo" "myorg/" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "empty org" "/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "extra segment" "myorg/myrepo/extra" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "whitespace" "my org/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "url with extra segments" "https://github.com/myorg/myrepo/issues" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "url without owner" "https://github.com/" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "url of another host" "https://gitlab.com/myorg/myrepo" "[FAIL] GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
-  dataprovider_case "exclude url of another host" "myorg" "--exclude=https://gitlab.com/myorg/one" "[FAIL] Excluded repository \"https://gitlab.com/myorg/one\" must be in the format \"org/repo\" or a GitHub URL"
-  dataprovider_case "unknown option" "myorg" "--force" "[FAIL] Unknown option \"--force\""
-  dataprovider_case "exclude without separator" "--exclude=myorg/one,two" "myorg" "[FAIL] Excluded repository \"two\" must be in the format \"org/repo\" or a GitHub URL"
-  dataprovider_case "exclude with another org" "myorg" "--exclude=myorg/one,otherorg/two" "[FAIL] Excluded repository \"otherorg/two\" does not belong to \"myorg\""
+  dataprovider_case "empty repo" "myorg/" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "empty org" "/myrepo" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "extra segment" "myorg/myrepo/extra" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "whitespace" "my org/myrepo" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "url with extra segments" "https://github.com/myorg/myrepo/issues" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "url without owner" "https://github.com/" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "url of another host" "https://gitlab.com/myorg/myrepo" '[FAIL] GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
+  dataprovider_case "exclude url of another host" "myorg" "--exclude=https://gitlab.com/myorg/one" '[FAIL] Excluded repository "https://gitlab.com/myorg/one" must be in the format "org/repo" or a GitHub URL'
+  dataprovider_case "unknown option" "myorg" "--force" '[FAIL] Unknown option "--force"'
+  dataprovider_case "exclude without separator" "--exclude=myorg/one,two" "myorg" '[FAIL] Excluded repository "two" must be in the format "org/repo" or a GitHub URL'
+  dataprovider_case "exclude with another org" "myorg" "--exclude=myorg/one,otherorg/two" '[FAIL] Excluded repository "otherorg/two" does not belong to "myorg"'
   dataprovider_case "exclude with a repository" "myorg/myrepo" "--exclude=myorg/one" "[FAIL] Option --exclude can only be used with an organization, not with a repository"
 }
 
@@ -243,14 +243,14 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_access)"
     "$(step_list 1 "$(labels_json "bug" "blocked" "URGENT" "good first issue")")"
-    "Removing label \"bug\" as it is not in the provided list"
+    'Removing label "bug" as it is not in the provided list'
     "$(step_api DELETE "/labels/bug" 204)"
-    "DELETED label \"bug\""
-    "Removing label \"good first issue\" as it is not in the provided list"
+    'DELETED label "bug"'
+    'Removing label "good first issue" as it is not in the provided list'
     "$(step_api DELETE "/labels/good%20first%20issue" 204)"
-    "DELETED label \"good first issue\""
-    "- Removing label \"blocked\""
-    "- Removing label \"URGENT\""
+    'DELETED label "good first issue"'
+    '- Removing label "blocked"'
+    '- Removing label "URGENT"'
   )
   steps_labels "BLOCKED|update|200|blocked" "URGENT|update|200|URGENT"
   STEPS+=("[ OK ] Label processing complete")
@@ -374,7 +374,7 @@ provide_invalid_arguments() {
     "$(step_access)"
     "$(step_list 1 "$(labels_json "bug" "Needs review")")"
     "$(step_api DELETE "/labels/bug" 403 '{"message":"Forbidden"}')"
-    "Unable to DELETE label \"bug\""
+    'Unable to DELETE label "bug"'
   )
   steps_labels "CONFLICT|create|422|" "Needs review|update|500|Needs review"
   STEPS+=(
@@ -434,7 +434,7 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/old:archived" "myorg/two")")"
-    "Found 2 repositories in \"myorg\":"
+    'Found 2 repositories in "myorg":'
     "myorg/one"
     "myorg/two"
     "- myorg/old"
@@ -461,7 +461,7 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myuser User)"
     "$(step_repos "/user/repos?affiliation=owner" 1 "$(repos_json "myuser/one" "otheruser/fork" "MyUser/two")")"
-    "Found 2 repositories in \"myuser\":"
+    'Found 2 repositories in "myuser":'
     "- otheruser/fork"
     "- Update labels in"
   )
@@ -482,10 +482,10 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/two" "myorg/three")")"
-    "Found 1 repositories in \"myorg\":"
+    'Found 1 repositories in "myorg":'
     "Skipped 0 archived and 2 excluded repositories"
-    "- Processing repository \"myorg/two\""
-    "- Processing repository \"myorg/three\""
+    '- Processing repository "myorg/two"'
+    '- Processing repository "myorg/three"'
   )
   steps_repos_labels "myorg/one"
   STEPS+=("[ OK ] Label processing complete")
@@ -511,7 +511,7 @@ provide_invalid_arguments() {
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "${page_one[@]}")")"
     "$(step_repos "/orgs/myorg/repos?type=all" 2 "$(repos_json "myorg/one")")"
-    "Found 1 repositories in \"myorg\":"
+    'Found 1 repositories in "myorg":'
     "Skipped 100 archived and 0 excluded repositories"
   )
   steps_repos_labels "myorg/one"
@@ -550,7 +550,7 @@ provide_invalid_arguments() {
 
   declare -a STEPS=(
     "$(step_owner myorg Organization 404)"
-    "[FAIL] Unable to find \"myorg\". Please check the name and your credentials"
+    '[FAIL] Unable to find "myorg". Please check the name and your credentials'
     "- Starting label processing"
   )
 
@@ -567,7 +567,7 @@ provide_invalid_arguments() {
 
   declare -a STEPS=(
     "$(step_request GET "/users/myorg" 200 '{"login":"myorg"}')"
-    "[FAIL] Unable to find \"myorg\". Please check the name and your credentials"
+    '[FAIL] Unable to find "myorg". Please check the name and your credentials'
   )
 
   mocks="$(steps_run "setup")"
@@ -584,7 +584,7 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 '{"message":"Server Error"}' 500)"
-    "[FAIL] Unable to list repositories of \"myorg\""
+    '[FAIL] Unable to list repositories of "myorg"'
     "- Starting label processing"
   )
 
@@ -602,7 +602,7 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/old:archived" "myorg/one")")"
-    "[FAIL] No repositories to process in \"myorg\""
+    '[FAIL] No repositories to process in "myorg"'
     "- Starting label processing"
   )
 
@@ -620,7 +620,7 @@ provide_invalid_arguments() {
   declare -a STEPS=(
     "$(step_owner myorg Organization)"
     "$(step_repos "/orgs/myorg/repos?type=all" 1 "$(repos_json "myorg/one" "myorg/two")")"
-    "Processing repository \"myorg/one\""
+    'Processing repository "myorg/one"'
   )
   TEST_REPO="myorg/one"
   STEPS+=(

@@ -4,7 +4,7 @@
 #
 # Run with "--verbose-run" to see debug output.
 #
-# shellcheck disable=SC2034
+# shellcheck disable=SC2016,SC2034,SC2119,SC2120
 
 ################################################################################
 #                       BATS HOOK IMPLEMENTATIONS                              #
@@ -37,18 +37,33 @@ setup() {
 #                               HELPERS                                        #
 ################################################################################
 
+# Runs code in a separate shell that has sourced the script.
+#
+# The code runs inside a function, because kcov traces with a PS4 that expands
+# BASH_SOURCE, and BASH_SOURCE is unset at the top level of 'bash -c' once the
+# script enables 'set -u'. The function runs the code in a subshell, because
+# bash 5.2 prints a 'pop_var_context' warning when 'set -e' exits the shell
+# from inside a function.
+#
+# Arguments:
+#   1. Code to run.
+#   2+. Arguments, available to the code as "$@".
+script_eval() {
+  bash -c '_with_script() { local file="${1}" code="${2}"; shift 2; source "${file}"; (eval "${code}"); }; _with_script "$@"' bash "${SCRIPT_FILE}" "$@"
+}
+
 # Runs a function from the script in a separate shell.
 #
 # Arguments:
 #   1. Function name.
 #   2+. Function arguments.
 script_function() {
-  bash -c 'source "${1}"; shift; "$@"' bash "${SCRIPT_FILE}" "$@"
+  script_eval '"$@"' "$@"
 }
 
 # Prints the labels the script provides: name, color and description per row.
 provided_labels() {
-  bash -c 'source "${1}"; printf "%s\n" "${labels[@]}"' bash "${SCRIPT_FILE}"
+  script_eval 'printf "%s\n" "${labels[@]}"'
 }
 
 # Prints the JSON payload the script sends for a label.

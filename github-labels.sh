@@ -122,12 +122,10 @@ main() {
 
   GITHUB_REPO="${GITHUB_REPO:-${target}}"
 
-  for cmd in curl; do
-    if ! command -v "${cmd}" >/dev/null; then
-      fail "Command ${cmd} is not available"
-      exit 1
-    fi
-  done
+  if ! command -v curl >/dev/null; then
+    fail "Command curl is not available"
+    exit 1
+  fi
 
   info "Processing GitHub labels."
 
@@ -155,7 +153,7 @@ main() {
   GITHUB_REPO="$(normalize_repo "${GITHUB_REPO}")"
 
   if ! is_repo_name "${GITHUB_REPO}" && ! is_owner_name "${GITHUB_REPO}"; then
-    fail "GitHub repository must be in the format \"org/repo\", \"org\" or a GitHub URL"
+    fail 'GitHub repository must be in the format "org/repo", "org" or a GitHub URL'
     exit 1
   fi
 
