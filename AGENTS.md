@@ -27,6 +27,7 @@ Shell script tests use BATS:
 
 
 - `.github/workflows/test-shell.yml` - Shell script testing
+- `.github/workflows/release-assets.yml` - Attaches `github-labels.sh` to published releases
 
 
 ## Updating from the template
