@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "Packages used for testing",
     "private": true,
-    "license": "GPL-3.0-or-later",
+    "license": "MIT",
     "devDependencies": {
         "bats-helpers": "npm:@drevops/bats-helpers@^2.0"
     }
