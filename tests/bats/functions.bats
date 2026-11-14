@@ -2,14 +2,14 @@
 #
 # Test the functions of github-labels.sh in isolation.
 #
-# shellcheck disable=SC2030,SC2031,SC2034
+# shellcheck disable=SC2016,SC2030,SC2031,SC2034
 
 load _helper
 
 @test "Script does not run when sourced" {
   mock_command "curl" >/dev/null
 
-  run bash -c 'source "${1}"; echo "sourced"' bash "${SCRIPT_FILE}"
+  run script_eval 'echo "sourced"'
   assert_success
   assert_output "sourced"
   mock_assert_no_calls
@@ -165,19 +165,19 @@ provide_normalize_repo() {
 }
 
 @test "parse_excludes normalizes GitHub URLs" {
-  run bash -c 'source "${1}"; parse_excludes myorg "https://github.com/myorg/one,git@github.com:MyOrg/two.git"; printf "%s\n" "${excluded_repos[@]}"' bash "${SCRIPT_FILE}"
+  run script_eval 'parse_excludes myorg "https://github.com/myorg/one,git@github.com:MyOrg/two.git"; printf "%s\n" "${excluded_repos[@]}"'
   assert_success
   assert_output $'myorg/one\nMyOrg/two'
 }
 
 @test "parse_excludes stores entries and skips empty ones" {
-  run bash -c 'source "${1}"; parse_excludes myorg "myorg/one,,MYORG/Two,"; printf "%s\n" "${excluded_repos[@]}"' bash "${SCRIPT_FILE}"
+  run script_eval 'parse_excludes myorg "myorg/one,,MYORG/Two,"; printf "%s\n" "${excluded_repos[@]}"'
   assert_success
   assert_output $'myorg/one\nMYORG/Two'
 }
 
 @test "parse_excludes accepts an empty list" {
-  run bash -c 'source "${1}"; parse_excludes myorg ""; echo "count=${#excluded_repos[@]}"' bash "${SCRIPT_FILE}"
+  run script_eval 'parse_excludes myorg ""; echo "count=${#excluded_repos[@]}"'
   assert_success
   assert_output "count=0"
 }
@@ -187,7 +187,7 @@ provide_normalize_repo() {
 }
 
 is_excluded() {
-  if bash -c 'source "${1}"; excluded_repos=("myorg/one" "MyOrg/Two"); is_excluded "${2}"' bash "${SCRIPT_FILE}" "${1}"; then
+  if script_eval 'excluded_repos=("myorg/one" "MyOrg/Two"); is_excluded "${1}"' "${1}"; then
     echo "excluded"
   else
     echo "included"
@@ -225,7 +225,7 @@ provide_confirm() {
 }
 
 @test "confirm prints the question with the default" {
-  run bash -c 'source "${1}"; confirm "Proceed?" </dev/null' bash "${SCRIPT_FILE}"
+  run script_eval 'confirm "Proceed?" </dev/null'
   assert_failure
   assert_output "Proceed? [y/N] "
 }
@@ -294,7 +294,7 @@ provide_is_provided_label() {
 }
 
 find_existing_label() {
-  if bash -c 'source "${1}"; existing_labels=("bug" "Blocked" "do not merge"); find_existing_label "${2}"' bash "${SCRIPT_FILE}" "${1}"; then
+  if script_eval 'existing_labels=("bug" "Blocked" "do not merge"); find_existing_label "${1}"' "${1}"; then
     return 0
   fi
 
